@@ -1,0 +1,10 @@
+(library
+ (name highlexer)
+ (public_name highlexer))
+
+(ocamllex html_escaping)
+
+(ocamllex ocaml_lexer)
+
+(menhir
+ (modules ocaml_parser))
