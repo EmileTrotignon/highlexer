@@ -1,12 +1,12 @@
 (** This library provides a way to highlight OCaml source. It is designed for
-  use with js-of-ocaml, but does not have to be used this way. 
+  use with js_of_ocaml, but does not have to be used this way. 
 
   Because the jsoo code elimination does not work well with the compiler-libs,
   this library uses a modified version of the OCaml lexer. This version has
-  error-handling disabled, and docstrings simplified, because these features
+  worse error-handling, and docstrings simplified, because these features
   required vendoring much more files from the OCaml source code.
   
-  Here is an example of how to use [highlexer] with [js-of-ocaml] and [brr] :
+  Here is an example of how to use [highlexer] with [js_of_ocaml] and [brr] :
 
 {[
 open Brr
@@ -40,7 +40,7 @@ let () =
 ]}
 
     This example had a size of 168K. This may improve a little bit with new versions of
-    [js-of-ocaml], but the lexing table itself is 104K, so it will never be
+    [js_of_ocaml], but the lexing table itself is 104K, so it will never be
     super small like a highlighter with just a few regexp could.
 
     If you are bothered by the size, it is perfectly fine to use this in the
