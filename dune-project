@@ -15,12 +15,12 @@
 
 (license MIT)
 
-(documentation https://ocaml.org/p/highlexer/latest/doc/index.html)
+(documentation "https://ocaml.org/p/highlexer/latest/doc/index.html")
 
 (package
  (name highlexer)
- (synopsis "An OCaml syntax highlighter based on the OCaml lexer.")
- (description "An OCaml syntax highlighter based on the OCaml lexer.")
+ (synopsis "An OCaml syntax highlighter based on the OCaml lexer")
+ (description "An OCaml syntax highlighter based on the OCaml lexer")
  (tags
   (js syntax highlighting))
  (depends
