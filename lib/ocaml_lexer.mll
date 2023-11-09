@@ -226,8 +226,8 @@ let char_for_decimal_code lexbuf i =
     then 'x'
     else
       illegal_escape lexbuf
-        (Printf.sprintf
-          "%d is outside the range of legal characters (0-255)." c)
+        (
+          "is outside the range of legal characters (0-255).")
   else Char.chr c
 
 let char_for_octal_code lexbuf i =
@@ -237,8 +237,8 @@ let char_for_octal_code lexbuf i =
     then 'x'
     else
       illegal_escape lexbuf
-        (Printf.sprintf
-          "o%o (=%d) is outside the range of legal characters (0-255)." c c)
+        (
+          "is outside the range of legal characters (0-255).")
   else Char.chr c
 
 let char_for_hexadecimal_code lexbuf i =
@@ -257,7 +257,7 @@ let uchar_for_uchar_escape lexbuf =
       let cp = num_value lexbuf ~base:16 ~first ~last in
       if Uchar.is_valid cp then Uchar.unsafe_of_int cp else
       illegal_escape lexbuf
-        (Printf.sprintf "%X is not a Unicode scalar value" cp)
+        ("is not a Unicode scalar value")
 
 let is_keyword name = Hashtbl.mem keyword_table name
 

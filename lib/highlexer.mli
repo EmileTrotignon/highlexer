@@ -39,8 +39,12 @@ let () =
   List.iter highlight_snippet ocaml_snippets
 ]}
 
-    This example had a size of 212K. This may improve with new versions of
-    [js-of-ocaml].
+    This example had a size of 168K. This may improve a little bit with new versions of
+    [js-of-ocaml], but the lexing table itself is 104K, so it will never be
+    super small like a highlighter with just a few regexp could.
+
+    If you are bothered by the size, it is perfectly fine to use this in the
+    backend instead.
 *)
 
 (** In [ {tag; content} ], [tag] is the name of the token associated with 

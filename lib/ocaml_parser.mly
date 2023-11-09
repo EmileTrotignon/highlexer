@@ -1,4 +1,4 @@
-(* This is a version of the OCaml parser that only has the token. It is used
+(* This is a version of the OCaml parser that only has the tokens. It is used
 to generate the token type. *)
 
 %token AMPERAMPER             "&&"
@@ -133,6 +133,6 @@ to generate the token type. *)
 %start <unit> program
 
 %%
-
+(* Empty on purpose *)
 program:
     EOL { () }

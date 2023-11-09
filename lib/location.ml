@@ -74,65 +74,6 @@ let input_phrase_buffer = ref (None : Buffer.t option)
 (******************************************************************************)
 (* Terminal info *)
 
-let status = ref Terminfo.Uninitialised
-
-let setup_terminal () =
-  if !status = Terminfo.Uninitialised then status := Terminfo.setup stdout
-
-(* The number of lines already printed after input.
-
-   This is used by [highlight_terminfo] to identify the current position of the
-   input in the terminal. This would not be possible without this information,
-   since printing several warnings/errors adds text between the user input and
-   the bottom of the terminal.
-
-   We also use for {!is_first_report}, see below.
-*)
-let num_loc_lines = ref 0
-
-(* We use [num_loc_lines] to determine if the report about to be
-   printed is the first or a follow-up report of the current
-   "batch" -- contiguous reports without user input in between, for
-   example for the current toplevel phrase. We use this to print
-   a blank line between messages of the same batch.
-*)
-let is_first_message () = !num_loc_lines = 0
-
-(* This is used by the toplevel to reset [num_loc_lines] before each phrase *)
-let reset () = num_loc_lines := 0
-
-(* This is used by the toplevel *)
-let echo_eof () = print_newline () ; incr num_loc_lines
-
-(* This is used by the toplevel and the report printers below. *)
-let separate_new_message ppf =
-  if not (is_first_message ()) then (
-    Format.pp_print_newline ppf () ;
-    incr num_loc_lines )
-
-(* Code printing errors and warnings must be wrapped using this function, in
-   order to update [num_loc_lines].
-
-   [print_updating_num_loc_lines ppf f arg] is equivalent to calling [f ppf
-   arg], and additionally updates [num_loc_lines]. *)
-let print_updating_num_loc_lines ppf f arg =
-  let open Format in
-  let out_functions = pp_get_formatter_out_functions ppf () in
-  let out_string str start len =
-    let rec count i c =
-      if i = start + len then c
-      else if String.get str i = '\n' then count (succ i) (succ c)
-      else count (succ i) c
-    in
-    num_loc_lines := !num_loc_lines + count start 0 ;
-    out_functions.out_string str start len
-  in
-  pp_set_formatter_out_functions ppf {out_functions with out_string} ;
-  f ppf arg ;
-  pp_print_flush ppf () ;
-  pp_set_formatter_out_functions ppf out_functions
-
-let setup_tags () = ()
 
 (******************************************************************************)
 (* Printing locations, e.g. 'File "foo.ml", line 3, characters 10-12' *)
@@ -226,84 +167,6 @@ end = struct
     else Some (fst (List.hd iset), snd (List.hd (List.rev iset)))
 end
 
-(******************************************************************************)
-(* Toplevel: highlighting and quoting locations *)
-
-(* Highlight the locations using standout mode.
-
-   If [locs] is empty, this function is a no-op.
-*)
-let highlight_terminfo lb ppf locs =
-  Format.pp_print_flush ppf () ;
-  (* avoid mixing Format and normal output *)
-  (* Char 0 is at offset -lb.lex_abs_pos in lb.lex_buffer. *)
-  let pos0 = -lb.lex_abs_pos in
-  (* Do nothing if the buffer does not contain the whole phrase. *)
-  if pos0 < 0 then raise Exit ;
-  (* Count number of lines in phrase *)
-  let lines = ref !num_loc_lines in
-  for i = pos0 to lb.lex_buffer_len - 1 do
-    if Bytes.get lb.lex_buffer i = '\n' then incr lines
-  done ;
-  (* If too many lines, give up *)
-  if !lines >= Terminfo.num_lines stdout - 2 then raise Exit ;
-  (* Move cursor up that number of lines *)
-  flush stdout ;
-  Terminfo.backup stdout !lines ;
-  (* Print the input, switching to standout for the location *)
-  let bol = ref false in
-  print_string "# " ;
-  for pos = 0 to lb.lex_buffer_len - pos0 - 1 do
-    if !bol then (
-      print_string "  " ;
-      bol := false ) ;
-    if List.exists (fun loc -> pos = loc.loc_start.pos_cnum) locs then
-      Terminfo.standout stdout true ;
-    if List.exists (fun loc -> pos = loc.loc_end.pos_cnum) locs then
-      Terminfo.standout stdout false ;
-    let c = Bytes.get lb.lex_buffer (pos + pos0) in
-    print_char c ;
-    bol := c = '\n'
-  done ;
-  (* Make sure standout mode is over *)
-  Terminfo.standout stdout false ;
-  (* Position cursor back to original location *)
-  Terminfo.resume stdout !num_loc_lines ;
-  flush stdout
-
-let highlight_terminfo lb ppf locs =
-  try highlight_terminfo lb ppf locs with Exit -> ()
-
-(* Highlight the location by printing it again.
-
-   There are two different styles for highlighting errors in "dumb" mode,
-   depending if the error fits on a single line or spans across several lines.
-
-   For single-line errors,
-
-     foo the_error bar
-
-   gets displayed as follows, where X is the line number:
-
-     X | foo the_error bar
-             ^^^^^^^^^
-
-
-   For multi-line errors,
-
-     foo the_
-     error bar
-
-   gets displayed as:
-
-     X1 | ....the_
-     X2 | error....
-
-   An ellipsis hides the middle lines of the multi-line error if it has more
-   than [max_lines] lines.
-
-   If [locs] is empty then this function is a no-op.
-*)
 
 type input_line = {text: string; start_pos: int}
 
@@ -418,44 +281,6 @@ let lines_around_from_current_input ~start_pos ~end_pos =
       lines_around_from_lexbuf lb ~start_pos ~end_pos
   | None, _, _ ->
       []
-
-(******************************************************************************)
-(* Reporting errors and warnings *)
-
-type msg = (Format.formatter -> unit) loc
-
-let msg ?(loc = none) fmt = Format.kdprintf (fun txt -> {loc; txt}) fmt
-
-type report_kind =
-  | Report_error
-  | Report_warning of string
-  | Report_warning_as_error of string
-  | Report_alert of string
-  | Report_alert_as_error of string
-
-type report = {kind: report_kind; main: msg; sub: msg list}
-
-type report_printer =
-  { (* The entry point *)
-    pp: report_printer -> Format.formatter -> report -> unit
-  ; pp_report_kind:
-      report_printer -> report -> Format.formatter -> report_kind -> unit
-  ; pp_main_loc: report_printer -> report -> Format.formatter -> t -> unit
-  ; pp_main_txt:
-         report_printer
-      -> report
-      -> Format.formatter
-      -> (Format.formatter -> unit)
-      -> unit
-  ; pp_submsgs: report_printer -> report -> Format.formatter -> msg list -> unit
-  ; pp_submsg: report_printer -> report -> Format.formatter -> msg -> unit
-  ; pp_submsg_loc: report_printer -> report -> Format.formatter -> t -> unit
-  ; pp_submsg_txt:
-         report_printer
-      -> report
-      -> Format.formatter
-      -> (Format.formatter -> unit)
-      -> unit }
 
 let is_dummy_loc loc =
   (* Fixme: this should be just [loc.loc_ghost] and the function should be
